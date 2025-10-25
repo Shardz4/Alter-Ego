@@ -4,6 +4,16 @@ module.exports = {
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    // Broader scan for dynamic classes to prevent purging
+    './src/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  safelist: [
+    // Retain core spacing utilities to address production layout compression
+    'p-1', 'p-2', 'p-4', 'p-6', 'p-8',
+    'm-1', 'm-2', 'm-4', 'm-6',
+    'space-x-2', 'space-x-4', 'space-y-2', 'space-y-4', 'space-y-6',
+    // Responsive variants for flexibility
+    { pattern: /(p|m|space)-(x|y)-[1-8]/, variants: ['sm', 'md', 'lg', 'xl'] },
   ],
   theme: {
     extend: {
@@ -76,4 +86,3 @@ module.exports = {
   },
   plugins: [],
 }
-
