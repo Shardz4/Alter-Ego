@@ -16,19 +16,19 @@ export default function Home() {
   const sampleMarkets = [
     {
       id: '1',
-      question: 'Will ETH hit $3k by end of 2024?',
+      question: 'Will ETH hit $4k by end of 2025?',
       resolveTs: Math.floor(Date.now() / 1000) + 86400 * 30, // 30 days from now
       address: '0x1234567890123456789012345678901234567890'
     },
     {
       id: '2',
-      question: 'Will BTC reach $100k by 2025?',
+      question: 'Will BTC reach $120k by 2026?',
       resolveTs: Math.floor(Date.now() / 1000) + 86400 * 60,
       address: '0x2345678901234567890123456789012345678901'
     },
     {
       id: '3',
-      question: 'Will the S&P 500 close above 5000 by year end?',
+      question: 'Will the S&P 500 close above 7000 by year end?',
       resolveTs: Math.floor(Date.now() / 1000) + 86400 * 45,
       address: '0x3456789012345678901234567890123456789012'
     },
