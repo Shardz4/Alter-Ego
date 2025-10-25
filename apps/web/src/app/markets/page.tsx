@@ -1,4 +1,4 @@
-import TradeForm from '@/components/TradeForm'
+import TradeForm from '@/Components/TradeForm'
 
 export default function MarketDetail({ params }: { params: { id: string } }) {
   return (
