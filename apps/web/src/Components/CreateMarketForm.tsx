@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { useWriteContract, useAccount, useSwitchChain } from 'wagmi'
+import { useWriteContract, useAccount, useSwitchChain, usePublicClient } from 'wagmi'
 import { parseEther } from 'viem'
 import { pushChain, deploymentChain } from '@/config/chains'
 
@@ -11,8 +11,9 @@ interface CreateMarketFormProps {
 
 export default function CreateMarketForm({ factoryAddress, onMarketCreated }: CreateMarketFormProps) {
   const { address, chain } = useAccount()
-  const { writeContract, isPending } = useWriteContract()
+  const { writeContractAsync, isPending } = useWriteContract()
   const { switchChain } = useSwitchChain()
+  const publicClient = usePublicClient()
   const [question, setQuestion] = useState('')
   const [resolveDate, setResolveDate] = useState('')
   const [resolveTime, setResolveTime] = useState('')
@@ -67,7 +68,6 @@ export default function CreateMarketForm({ factoryAddress, onMarketCreated }: Cr
         setIsNetworkSwitching(false)
       }
 
-
       // Use the appropriate factory address based on the selected chain.
       // Prefer explicit prop `factoryAddress`; fall back to NEXT_PUBLIC_* env vars.
       const envFactory = (process.env.NEXT_PUBLIC_MARKET_FACTORY_ADDRESS as string) || undefined
@@ -98,19 +98,20 @@ export default function CreateMarketForm({ factoryAddress, onMarketCreated }: Cr
         }
       ]
 
-      const result = await writeContract({
+      const hash = await writeContractAsync({
         address: targetAddress as `0x${string}`,
         abi: marketAbi,
         functionName: 'createMarket',
         args: [question, BigInt(resolveTs)]
       })
-      // If the returned object is a transaction response, wait for it to be mined
-      try {
-        if (result && typeof (result as any).wait === 'function') {
-          await (result as any).wait?.()
+
+      // Wait for the transaction to be mined using the public client
+      if (hash && publicClient) {
+        try {
+          await publicClient.waitForTransactionReceipt({ hash })
+        } catch (err) {
+          console.warn('Could not wait for tx confirmation:', err)
         }
-      } catch (err) {
-        console.warn('Could not wait for tx confirmation:', err)
       }
 
       setQuestion('')

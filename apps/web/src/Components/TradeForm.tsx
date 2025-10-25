@@ -59,8 +59,8 @@ export default function TradeForm({ marketAddress, onTradeComplete }: TradeFormP
     try {
       const amountWei = parseEther(amount)
       const minOut = isYes 
-        ? amountWei * BigInt(100 - slippage) / 100n
-        : amountWei * BigInt(100 - slippage) / 100n
+        ? amountWei * BigInt(100 - slippage) / BigInt(100)
+        : amountWei * BigInt(100 - slippage) / BigInt(100)
 
       const functionName = isYes ? 'buyYes' : 'buyNo'
       
