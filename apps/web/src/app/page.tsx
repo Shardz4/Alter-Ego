@@ -136,9 +136,7 @@ export default function Home() {
             </div>
             <div className="flex items-center">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-black rounded-lg flex items-center justify-center border border-amber-600/20">
-                  <span className="text-amber-400 font-bold text-lg">A</span>
-                </div>
+                <img src="/alter.ico" alt="Alter Ego" className="w-10 h-10 rounded-md object-cover border border-amber-600/20" />
                 <div>
                   <h1 className="text-2xl font-bold text-amber-400">
                     Alter Ego
