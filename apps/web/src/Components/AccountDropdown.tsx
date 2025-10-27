@@ -1,58 +1,56 @@
-'use client'
+'use client';
 
-import { useEffect, useRef, useState } from 'react'
-import { signOutFirebase, onAuthStateChanged, User } from '@/lib/firebase'
-import { useAccount, useDisconnect } from 'wagmi'
-import ConnectButton from './ConnectButton'
-import Link from 'next/link'
+import { useEffect, useRef, useState } from 'react';
+import { signOutFirebase, onAuthStateChanged, User } from '@/lib/firebase';
+import { useAccount, useDisconnect } from 'wagmi';
+import {
+  PushUniversalAccountButton,
+} from '@pushchain/ui-kit';
+import Link from 'next/link';
 
 export default function AccountDropdown() {
-  const [user, setUser] = useState<User | null>(null)
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement | null>(null)
+  const [user, setUser] = useState<User | null>(null);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    // onAuthStateChanged is guarded; it will no-op on server and work in browser
-    const unsub = onAuthStateChanged((u: User | null) => setUser(u))
-    return () => unsub()
-  }, [])
+    const unsub = onAuthStateChanged((u: User | null) => setUser(u));
+    return () => unsub();
+  }, []);
 
-  // If the wallet is connected but the user is not signed in, disconnect the wallet
-  const { isConnected } = useAccount()
-  const { disconnect } = useDisconnect()
+  const { isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
 
   useEffect(() => {
     if (!user && isConnected) {
-      // disconnect to avoid automatic persistent connection
       try {
-        disconnect()
+        disconnect();
       } catch (err) {
-        console.warn('Failed to disconnect wallet automatically', err)
+        console.warn('Failed to disconnect wallet automatically', err);
       }
     }
-  }, [user, isConnected, disconnect])
+  }, [user, isConnected, disconnect]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('click', onDocClick)
-    return () => document.removeEventListener('click', onDocClick)
-  }, [])
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('click', onDocClick);
+    return () => document.removeEventListener('click', onDocClick);
+  }, []);
 
   const handleSignOut = async () => {
     try {
-      await signOutFirebase()
+      await signOutFirebase();
     } finally {
-      // ensure wallet disconnect on sign out
       try {
-        disconnect()
+        disconnect();
       } catch (err) {
-        console.warn('Disconnect failed during sign out', err)
+        console.warn('Disconnect failed during sign out', err);
       }
-      setOpen(false)
+      setOpen(false);
     }
-  }
+  };
 
   return (
     <div className="relative" ref={ref}>
@@ -83,8 +81,20 @@ export default function AccountDropdown() {
                 </div>
               </div>
 
-              <div>
-                <ConnectButton />
+              <div className="border-t border-gray-600 pt-3">
+                <PushUniversalAccountButton
+                  uid="alter-ego-wallet" // Matches walletConfig uid
+                  connectButtonText="Connect with Push Wallet"
+                  modalAppOverride={{
+                    title: 'Connect to Alter Ego',
+                  }}
+                  loginAppOverride={{
+                    title: 'Sign in with Email or Google',
+                  }}
+                  themeOverrides={{
+                    '--pwauth-btn-connect-bg-color': '#D4AF37', // Aligns with your amber theme
+                  }}
+                />
               </div>
 
               <div className="flex space-x-2">
@@ -99,14 +109,33 @@ export default function AccountDropdown() {
           ) : (
             <div className="space-y-3">
               <div className="text-sm text-gray-300">You are not signed in.</div>
+              <div className="border-t border-gray-600 pt-3">
+                <PushUniversalAccountButton
+                  uid="alter-ego-wallet" // Matches walletConfig uid
+                  connectButtonText="Connect with Push Wallet"
+                  modalAppOverride={{
+                    title: 'Connect to Alter Ego',
+                  }}
+                  loginAppOverride={{
+                    title: 'Sign in with Email or Google',
+                  }}
+                  themeOverrides={{
+                    '--pwauth-btn-connect-bg-color': '#D4AF37', // Aligns with your amber theme
+                  }}
+                />
+              </div>
               <div className="flex space-x-2">
-                <Link href="/login" className="flex-1 bg-black py-2 rounded-lg text-amber-400 text-center border border-amber-600/20">Sign in</Link>
-                <button onClick={() => setOpen(false)} className="flex-1 bg-gray-800 py-2 rounded-lg text-gray-200">Close</button>
+                <Link href="/login" className="flex-1 bg-black py-2 rounded-lg text-amber-400 text-center border border-amber-600/20">
+                  Sign in
+                </Link>
+                <button onClick={() => setOpen(false)} className="flex-1 bg-gray-800 py-2 rounded-lg text-gray-200">
+                  Close
+                </button>
               </div>
             </div>
           )}
         </div>
       )}
     </div>
-  )
+  );
 }
