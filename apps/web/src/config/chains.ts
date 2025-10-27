@@ -1,35 +1,27 @@
 import { createConfig, http } from 'wagmi';
+import { injected } from 'wagmi/connectors';
 import { sepolia } from 'wagmi/chains';
-import { PushWalletConnector } from '@/lib/pushWalletConnector';
-import { metaMask } from 'wagmi/connectors';
-
-export const pushChain = {
-  id: 42101,
-  name: 'Push Chain Donut Testnet',
-  network: 'push-donut',
-  nativeCurrency: {
-    decimals: 18,
-    name: 'Push Chain',
-    symbol: 'PC',
-  },
-  rpcUrls: {
-    default: { http: [process.env.NEXT_PUBLIC_PUSH_RPC || 'https://evm.rpc-testnet-donut-node1.push.org'] },
-    public: { http: [process.env.NEXT_PUBLIC_PUSH_RPC || 'https://evm.rpc-testnet-donut-node1.push.org'] },
-  },
-  blockExplorers: {
-    default: { name: 'Push Chain Explorer', url: 'https://donut.push.network' },
-  },
-  testnet: true,
-};
-
-// Using Ethereum Sepolia testnet for deployment
-export const deploymentChain = sepolia;
-
+// Define pushDonutTestnet to avoid naming conflicts
+export const pushDonutTestnet = {
+id: 42101,
+name: 'Push Chain Donut Testnet',
+nativeCurrency: { name: 'Push', symbol: 'PC', decimals: 18 },
+rpcUrls: {
+default: { http: ['https://evm.rpc-testnet-donut-node1.push.org/', 'https://evm.rpc-testnet-donut-node2.push.org/'] },
+public: { http: ['https://evm.rpc-testnet-donut-node1.push.org/', 'https://evm.rpc-testnet-donut-node2.push.org/'] },
+},
+blockExplorers: {
+default: { name: 'Push Donut Explorer', url: 'https://evm-explorer-testnet.push.org' },
+},
+} as const;
+export const deploymentChain = sepolia;  // Your existing chain
 export const config = createConfig({
-  chains: [deploymentChain, pushChain],
-  connectors: [PushWalletConnector({ chains: [deploymentChain, pushChain] }), metaMask()],
-  transports: { 
-    [pushChain.id]: http(pushChain.rpcUrls.default.http[0]),
-    [deploymentChain.id]: http(deploymentChain.rpcUrls.default.http[0])
-  },
+chains: [sepolia, pushDonutTestnet],
+connectors: [
+injected({ target: 'metaMask' }),  // Bridges Push's injected provider
+],
+transports: {
+[sepolia.id]: http(),
+[pushDonutTestnet.id]: http(),
+},
 });

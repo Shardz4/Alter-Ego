@@ -1,7 +1,8 @@
 'use client'
 import { useState } from 'react'
-import { useWriteContract, useReadContract, useAccount } from 'wagmi'
+import { useWriteContract, useReadContract, useAccount, useWalletClient, useSwitchChain } from 'wagmi'
 import { parseEther, formatEther } from 'viem'
+import { deploymentChain, pushDonutTestnet } from '@/config/chains'
 
 interface TradeFormProps {
   marketAddress?: string
@@ -9,8 +10,10 @@ interface TradeFormProps {
 }
 
 export default function TradeForm({ marketAddress, onTradeComplete }: TradeFormProps) {
-  const { address } = useAccount()
+  const { address, chain, isConnected } = useAccount()
+  const { data: walletClient } = useWalletClient()
   const { writeContract, isPending } = useWriteContract()
+  const { switchChain } = useSwitchChain()
   const [amount, setAmount] = useState('')
   const [isYes, setIsYes] = useState(true)
   const [slippage, setSlippage] = useState(1) // 1% default slippage
@@ -19,79 +22,94 @@ export default function TradeForm({ marketAddress, onTradeComplete }: TradeFormP
     address: marketAddress as `0x${string}`,
     abi: [
       {
-        "inputs": [],
-        "name": "getMarketInfo",
-        "outputs": [
-          {"name": "_question", "type": "string"},
-          {"name": "_resolveTs", "type": "uint64"},
-          {"name": "_settled", "type": "bool"},
-          {"name": "_result", "type": "bytes32"},
-          {"name": "_totalYes", "type": "uint256"},
-          {"name": "_totalNo", "type": "uint256"}
+        inputs: [],
+        name: 'getMarketInfo',
+        outputs: [
+          { name: '_question', type: 'string' },
+          { name: '_resolveTs', type: 'uint64' },
+          { name: '_settled', type: 'bool' },
+          { name: '_result', type: 'bytes32' },
+          { name: '_totalYes', type: 'uint256' },
+          { name: '_totalNo', type: 'uint256' },
         ],
-        "stateMutability": "view",
-        "type": "function"
-      }
+        stateMutability: 'view',
+        type: 'function',
+      },
     ],
     functionName: 'getMarketInfo',
-    query: { enabled: !!marketAddress }
+    query: { enabled: !!marketAddress },
   })
 
   const { data: priceYes } = useReadContract({
     address: marketAddress as `0x${string}`,
     abi: [
       {
-        "inputs": [],
-        "name": "getPriceYes",
-        "outputs": [{"name": "priceRay", "type": "uint256"}],
-        "stateMutability": "view",
-        "type": "function"
-      }
+        inputs: [],
+        name: 'getPriceYes',
+        outputs: [{ name: 'priceRay', type: 'uint256' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
     ],
     functionName: 'getPriceYes',
-    query: { enabled: !!marketAddress }
+    query: { enabled: !!marketAddress },
   })
 
   const handleTrade = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!marketAddress || !amount || !address) return
+    if (!marketAddress || !amount) return
+
+    // Robust connection guard: require address + walletClient
+    if (!isConnected || !walletClient || !address) {
+      alert('Please connect your wallet to trade')
+      return
+    }
+
+    // Optional: ensure on the same chain as the market if your markets are per-chain
+    // Here we assume deploymentChain is the default chain for markets
+    if (chain && chain.id !== deploymentChain.id && chain.id !== pushDonutTestnet.id) {
+      try {
+        await switchChain({ chainId: deploymentChain.id })
+      } catch (err) {
+        console.error('Failed to switch network', err)
+        alert('Please switch to the correct network and try again')
+        return
+      }
+    }
 
     try {
       const amountWei = parseEther(amount)
-      const minOut = isYes 
-        ? amountWei * BigInt(100 - slippage) / BigInt(100)
-        : amountWei * BigInt(100 - slippage) / BigInt(100)
-
+      const minOut = (amountWei * BigInt(100 - slippage)) / BigInt(100)
       const functionName = isYes ? 'buyYes' : 'buyNo'
-      
+
       await writeContract({
         address: marketAddress as `0x${string}`,
         abi: [
           {
-            "inputs": [
-              {"name": "uUsdIn", "type": "uint256"},
-              {"name": "minYesOut", "type": "uint256"},
-              {"name": "to", "type": "address"}
+            inputs: [
+              { name: 'uUsdIn', type: 'uint256' },
+              { name: 'minYesOut', type: 'uint256' },
+              { name: 'to', type: 'address' },
             ],
-            "name": "buyYes",
-            "outputs": [{"name": "yesOut", "type": "uint256"}],
-            "stateMutability": "nonpayable",
-            "type": "function"
+            name: 'buyYes',
+            outputs: [{ name: 'yesOut', type: 'uint256' }],
+            stateMutability: 'nonpayable',
+            type: 'function',
           },
           {
-            "inputs": [
-              {"name": "uUsdIn", "type": "uint256"},
-              {"name": "minNoOut", "type": "uint256"},
-              {"name": "to", "type": "address"}
+            inputs: [
+              { name: 'uUsdIn', type: 'uint256' },
+              { name: 'minNoOut', type: 'uint256' },
+              { name: 'to', type: 'address' },
             ],
-            "name": "buyNo",
-            "outputs": [{"name": "noOut", "type": "uint256"}],
-            "stateMutability": "nonpayable",
-            "type": "function"
-          }
+            name: 'buyNo',
+            outputs: [{ name: 'noOut', type: 'uint256' }],
+            stateMutability: 'nonpayable',
+            type: 'function',
+          },
         ],
         functionName: functionName as 'buyYes' | 'buyNo',
-        args: [amountWei, minOut, address]
+        args: [amountWei, minOut, address],
       })
 
       onTradeComplete?.()
@@ -184,7 +202,7 @@ export default function TradeForm({ marketAddress, onTradeComplete }: TradeFormP
           />
         </div>
 
-  <div className="bg-neutral-900/10 p-4 rounded-lg">
+        <div className="bg-neutral-900/10 p-4 rounded-lg">
           <div className="flex justify-between text-sm">
             <span>Current Price:</span>
             <span className="font-medium">

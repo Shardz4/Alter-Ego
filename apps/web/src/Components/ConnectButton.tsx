@@ -1,15 +1,12 @@
 'use client'
-import { useState } from 'react'
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
-import { metaMask } from 'wagmi/connectors'
+import { injected, metaMask } from 'wagmi/connectors'
 
 export default function ConnectButton() {
   const { address, isConnected, chain } = useAccount()
   const { connect } = useConnect()
   const { disconnect } = useDisconnect()
-  // no push chain toggle
 
-  // Format address for display
   const formatAddress = (addr: string | undefined) => {
     if (!addr) return ''
     return `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`
@@ -21,6 +18,26 @@ export default function ConnectButton() {
     } catch (err) {
       console.error('MetaMask connect failed', err)
       alert('MetaMask connection failed. Please ensure MetaMask is installed and unlocked.')
+    }
+  }
+
+  const connectPush = async () => {
+    try {
+      await connect({
+        connector: injected({
+          target: {
+            id: 'pushWallet',
+            name: 'Push Wallet',
+            provider(window: any) {
+              return window?.ethereum?.isPushWallet ? window.ethereum : undefined
+            },
+          },
+          shimDisconnect: true,
+        }),
+      })
+    } catch (err) {
+      console.error('Push Wallet connect failed', err)
+      alert('Push Wallet connection failed. Please ensure Push Wallet is available in this browser.')
     }
   }
 
@@ -36,6 +53,13 @@ export default function ConnectButton() {
             className="bg-black text-amber-400 font-medium py-2 px-4 rounded-lg shadow-sm hover:shadow-md transition-all hover:bg-neutral-900 border border-amber-600/20"
           >
             Connect MetaMask
+          </button>
+          <button
+            onClick={connectPush}
+            type="button"
+            className="bg-neutral-800 text-amber-300 font-medium py-2 px-4 rounded-lg shadow-sm hover:shadow-md transition-all hover:bg-neutral-900 border border-amber-600/20"
+          >
+            Connect Push Wallet
           </button>
         </div>
       ) : (

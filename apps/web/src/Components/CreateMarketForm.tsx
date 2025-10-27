@@ -1,8 +1,7 @@
 'use client'
 import { useState } from 'react'
-import { useWriteContract, useAccount, useSwitchChain, usePublicClient } from 'wagmi'
-import { parseEther } from 'viem'
-import { pushChain, deploymentChain } from '@/config/chains'
+import { useWriteContract, useAccount, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi'
+import { pushDonutTestnet as pushChain, deploymentChain } from '@/config/chains'
 
 interface CreateMarketFormProps {
   factoryAddress?: string
@@ -10,7 +9,8 @@ interface CreateMarketFormProps {
 }
 
 export default function CreateMarketForm({ factoryAddress, onMarketCreated }: CreateMarketFormProps) {
-  const { address, chain } = useAccount()
+  const { address, chain, isConnected } = useAccount()
+  const { data: walletClient } = useWalletClient()
   const { writeContractAsync, isPending } = useWriteContract()
   const { switchChain } = useSwitchChain()
   const publicClient = usePublicClient()
@@ -26,7 +26,14 @@ export default function CreateMarketForm({ factoryAddress, onMarketCreated }: Cr
 
   const handleCreateMarket = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!question || !resolveDate || !resolveTime || !address) return
+
+    if (!question || !resolveDate || !resolveTime) return
+
+    // Robust connection guard
+    if (!isConnected || !walletClient || !address) {
+      alert('Please connect your wallet to create markets')
+      return
+    }
 
     try {
       const resolveDateTime = new Date(`${resolveDate}T${resolveTime}`)
@@ -39,11 +46,9 @@ export default function CreateMarketForm({ factoryAddress, onMarketCreated }: Cr
 
       // Switch to the appropriate network based on deployment choice
       if (deployToPushChain && chain?.id !== pushChain.id) {
-        // Switch to Push Chain for cross-chain deployment
         setIsNetworkSwitching(true)
         try {
           await switchChain({ chainId: pushChain.id })
-          // Wait a moment for network switch to complete
           await new Promise(resolve => setTimeout(resolve, 1000))
         } catch (error) {
           console.error('Failed to switch to Push Chain:', error)
@@ -53,11 +58,9 @@ export default function CreateMarketForm({ factoryAddress, onMarketCreated }: Cr
         }
         setIsNetworkSwitching(false)
       } else if (!deployToPushChain && chain?.id !== deploymentChain.id) {
-        // Switch to Ethereum Sepolia testnet for regular deployment
         setIsNetworkSwitching(true)
         try {
           await switchChain({ chainId: deploymentChain.id })
-          // Wait a moment for network switch to complete
           await new Promise(resolve => setTimeout(resolve, 1000))
         } catch (error) {
           console.error(`Failed to switch to ${deploymentChain.name}:`, error)
@@ -68,8 +71,6 @@ export default function CreateMarketForm({ factoryAddress, onMarketCreated }: Cr
         setIsNetworkSwitching(false)
       }
 
-      // Use the appropriate factory address based on the selected chain.
-      // Prefer explicit prop `factoryAddress`; fall back to NEXT_PUBLIC_* env vars.
       const envFactory = (process.env.NEXT_PUBLIC_MARKET_FACTORY_ADDRESS as string) || undefined
       const envPushFactory = (process.env.NEXT_PUBLIC_PUSH_CHAIN_FACTORY_ADDRESS as string) || undefined
 
@@ -82,30 +83,26 @@ export default function CreateMarketForm({ factoryAddress, onMarketCreated }: Cr
         return
       }
 
-      console.log(`Creating market on ${deployToPushChain ? 'Push Chain' : deploymentChain.name}`)
-
-      // The ABI might be different between chains, so we use the appropriate one
       const marketAbi = [
         {
-          "inputs": [
-            {"name": "question", "type": "string"},
-            {"name": "resolveTs", "type": "uint64"}
+          inputs: [
+            { name: 'question', type: 'string' },
+            { name: 'resolveTs', type: 'uint64' },
           ],
-          "name": "createMarket",
-          "outputs": [{"name": "market", "type": "address"}],
-          "stateMutability": "nonpayable",
-          "type": "function"
-        }
+          name: 'createMarket',
+          outputs: [{ name: 'market', type: 'address' }],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
       ]
 
       const hash = await writeContractAsync({
         address: targetAddress as `0x${string}`,
         abi: marketAbi,
         functionName: 'createMarket',
-        args: [question, BigInt(resolveTs)]
+        args: [question, BigInt(resolveTs)],
       })
 
-      // Wait for the transaction to be mined using the public client
       if (hash && publicClient) {
         try {
           await publicClient.waitForTransactionReceipt({ hash })
@@ -118,7 +115,6 @@ export default function CreateMarketForm({ factoryAddress, onMarketCreated }: Cr
       setResolveDate('')
       setResolveTime('')
       setShowForm(false)
-      // Notify parent to refresh markets list (parent will refetch from factory)
       onMarketCreated?.('')
     } catch (error) {
       console.error('Market creation failed:', error)
