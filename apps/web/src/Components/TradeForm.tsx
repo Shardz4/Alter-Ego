@@ -60,8 +60,13 @@ export default function TradeForm({ marketAddress, onTradeComplete }: TradeFormP
     if (!marketAddress || !amount) return
 
     // Robust connection guard: require address + walletClient
-    if (!isConnected || !walletClient || !address) {
+    if (!address) {
       alert('Please connect your wallet to trade')
+      return
+    }
+
+    if (!walletClient) {
+      alert('Wallet client not available. Please reconnect your wallet.')
       return
     }
 
@@ -122,7 +127,8 @@ export default function TradeForm({ marketAddress, onTradeComplete }: TradeFormP
   const isSettled = marketInfo?.[2] || false
   const price = priceYes ? Number(formatEther(priceYes)) : 0.5
 
-  if (!address) {
+  // Only show "connect wallet" if truly not connected
+  if (!isConnected || !address) {
     return (
       <div className="p-6 border-2 border-dashed border-gray-300 rounded-lg text-center">
         <p className="text-gray-500">Please connect your wallet to trade</p>

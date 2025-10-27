@@ -30,8 +30,13 @@ export default function CreateMarketForm({ factoryAddress, onMarketCreated }: Cr
     if (!question || !resolveDate || !resolveTime) return
 
     // Robust connection guard
-    if (!isConnected || !walletClient || !address) {
+    if (!address) {
       alert('Please connect your wallet to create markets')
+      return
+    }
+
+    if (!walletClient) {
+      alert('Wallet client not available. Please reconnect your wallet.')
       return
     }
 
@@ -121,7 +126,8 @@ export default function CreateMarketForm({ factoryAddress, onMarketCreated }: Cr
     }
   }
 
-  if (!address) {
+  // Only show "connect wallet" if truly not connected
+  if (!isConnected || !address) {
     return (
       <div className="p-6 border-2 border-dashed border-gray-300 rounded-lg text-center">
         <p className="text-gray-500">Please connect your wallet to create markets</p>
