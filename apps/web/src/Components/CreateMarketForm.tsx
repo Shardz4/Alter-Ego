@@ -2,6 +2,11 @@
 import { useState } from 'react'
 import { useWriteContract, useAccount, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi'
 import { pushDonutTestnet as pushChain, deploymentChain } from '@/config/chains'
+import { Button } from './ui/Button'
+import { Input } from './ui/Input'
+import { Textarea } from './ui/Textarea'
+import { Checkbox } from './ui/Checkbox'
+import { Card } from './ui/Card'
 
 interface CreateMarketFormProps {
   factoryAddress?: string
@@ -136,126 +141,107 @@ export default function CreateMarketForm({ factoryAddress, onMarketCreated }: Cr
   }
 
   return (
-    <div className="bg-white border-2 border-gray-200 rounded-lg p-6 shadow-lg">
+    <Card>
       {!showForm ? (
         <div className="text-center">
-          <h3 className="text-lg font-semibold mb-4">Create New Market</h3>
-          <p className="text-gray-600 mb-4">
-            Create a prediction market for any event you want to predict
-          </p>
-            <button
-              onClick={() => setShowForm(true)}
-              className="bg-amber-600 text-white py-2 px-6 rounded-lg hover:bg-amber-700 transition-colors"
-            >
-              Create Market
-            </button>
+          <h3 className="text-xl font-semibold tracking-tight text-gray-900">Create a market</h3>
+          <p className="mt-2 text-sm text-gray-500">Spin up a new binary market with a clear question and a future resolution time.</p>
+          <div className="mt-6">
+            <Button onClick={() => setShowForm(true)} size="md">New market</Button>
+          </div>
         </div>
       ) : (
-        <form onSubmit={handleCreateMarket} className="space-y-4">
-          <h3 className="text-lg font-semibold mb-4">Create New Market</h3>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Market Question *
-            </label>
-            <textarea
+        <form onSubmit={handleCreateMarket} className="space-y-6">
+          <div className="space-y-1">
+            <h3 className="text-xl font-semibold tracking-tight text-gray-900">Create a market</h3>
+            <p className="text-sm text-gray-500">Define your question and when it will resolve. Markets are binary (YES/NO).</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">Market question</label>
+            <Textarea
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder="e.g., Will Bitcoin reach $100,000 by end of 2024?"
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+              placeholder="Will Bitcoin reach $100,000 by the end of 2024?"
               required
               rows={3}
             />
-            <p className="text-sm text-gray-500 mt-1">
-              Be specific and clear about what you're predicting
-            </p>
+            <p className="text-xs text-gray-500">Be specific and unambiguous. Include any objective data sources if needed.</p>
           </div>
-          
-          <div className="flex items-center">
-            <input
+
+          <div className="flex items-center gap-2">
+            <Checkbox
               id="deployToPushChain"
-              type="checkbox"
               checked={deployToPushChain}
-              onChange={(e) => setDeployToPushChain(e.target.checked)}
-              className="h-4 w-4 accent-amber-400 focus:ring-amber-400 border-gray-300 rounded"
+              onChange={(e) => setDeployToPushChain((e.target as HTMLInputElement).checked)}
             />
-            <label htmlFor="deployToPushChain" className="ml-2 block text-sm text-gray-700">
-              Deploy to Push Chain (Cross-chain market)
+            <label htmlFor="deployToPushChain" className="text-sm text-gray-700">
+              Deploy to Push Chain (cross-chain)
             </label>
           </div>
-          
+
           {deployToPushChain ? (
-            <div className="bg-neutral-900/10 p-3 rounded-lg mt-2 text-sm">
+            <div className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-800">
               <p>Your market will be deployed on Push Chain, enabling cross-chain trading and liquidity.</p>
               {chain?.id !== pushChain.id && (
-                <p className="text-orange-600 mt-1">Note: You'll be prompted to switch to Push Chain network.</p>
+                <p className="mt-1">You'll be prompted to switch to the Push Chain network.</p>
               )}
             </div>
           ) : (
-            <div className="bg-gray-50 p-3 rounded-lg mt-2 text-sm">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
               <p>Your market will be deployed on Ethereum Sepolia testnet.</p>
               {chain?.id !== deploymentChain.id && (
-                <p className="text-orange-600 mt-1">Note: You'll be prompted to switch to Ethereum Sepolia network.</p>
+                <p className="mt-1">You'll be prompted to switch to the Sepolia network.</p>
               )}
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Resolution Date *
-              </label>
-              <input
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Resolution date</label>
+              <Input
                 type="date"
                 value={resolveDate}
                 onChange={(e) => setResolveDate(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent"
                 required
                 min={new Date().toISOString().split('T')[0]}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Resolution Time *
-              </label>
-              <input
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Resolution time</label>
+              <Input
                 type="time"
                 value={resolveTime}
                 onChange={(e) => setResolveTime(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent"
                 required
               />
             </div>
           </div>
 
-            <div className="bg-neutral-900/10 p-4 rounded-lg">
-              <h4 className="font-medium text-amber-400 mb-2">Market Guidelines</h4>
-              <ul className="text-sm text-amber-300 space-y-1">
-              <li>• Questions should be binary (YES/NO)</li>
-              <li>• Be specific about the outcome being measured</li>
-              <li>• Set realistic resolution times</li>
-              <li>• Consider using objective data sources</li>
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <h4 className="text-sm font-medium text-gray-900">Market guidelines</h4>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-600">
+              <li>Questions should be binary (YES/NO)</li>
+              <li>Be specific about the outcome being measured</li>
+              <li>Set realistic resolution times</li>
+              <li>Consider using objective data sources</li>
             </ul>
           </div>
 
-          <div className="flex space-x-3">
-            <button
+          <div className="flex items-center gap-3">
+            <Button
               type="submit"
               disabled={isPending || isNetworkSwitching || !question || !resolveDate || !resolveTime}
-              className="flex-1 bg-amber-600 text-white py-3 px-4 rounded-lg hover:bg-amber-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              fullWidth
             >
-              {isNetworkSwitching ? 'Switching Network...' : isPending ? 'Creating Market...' : `Create Market on ${deployToPushChain ? 'Push Chain' : 'Sepolia'}`}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
+              {isNetworkSwitching ? 'Switching network…' : isPending ? 'Creating market…' : `Create on ${deployToPushChain ? 'Push Chain' : 'Sepolia'}`}
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
               Cancel
-            </button>
+            </Button>
           </div>
         </form>
       )}
-    </div>
+    </Card>
   )
 }
