@@ -1,147 +1,88 @@
 'use client'
 import { useState } from 'react'
-import { useWriteContract, useReadContract, useAccount, useWalletClient, useSwitchChain } from 'wagmi'
-import { parseEther, formatEther } from 'viem'
-import { deploymentChain, pushDonutTestnet } from '@/config/chains'
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
+import { buyYesPayload, buyNoPayload, waitForTransaction } from '@/lib/aptosClient'
 
 interface TradeFormProps {
   marketAddress?: string
+  marketId?: number
+  isYes?: boolean
+  agreementPercentage?: number
   onTradeComplete?: () => void
 }
 
-export default function TradeForm({ marketAddress, onTradeComplete }: TradeFormProps) {
-  const { address, chain, isConnected } = useAccount()
-  const { data: walletClient } = useWalletClient()
-  const { writeContract, isPending } = useWriteContract()
-  const { switchChain } = useSwitchChain()
+export default function TradeForm({
+  marketAddress,
+  marketId,
+  isYes: propIsYes,
+  agreementPercentage: propAgreementPercentage,
+  onTradeComplete
+}: TradeFormProps) {
+  const { account, connected, signAndSubmitTransaction } = useWallet()
   const [amount, setAmount] = useState('')
-  const [isYes, setIsYes] = useState(true)
-  const [slippage, setSlippage] = useState(1) // 1% default slippage
+  const [isYes, setIsYes] = useState(propIsYes !== undefined ? propIsYes : true)
+  const [agreementPercentage, setAgreementPercentage] = useState(propAgreementPercentage || 50)
+  const [slippage, setSlippage] = useState(1)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const { data: marketInfo } = useReadContract({
-    address: marketAddress as `0x${string}`,
-    abi: [
-      {
-        inputs: [],
-        name: 'getMarketInfo',
-        outputs: [
-          { name: '_question', type: 'string' },
-          { name: '_resolveTs', type: 'uint64' },
-          { name: '_settled', type: 'bool' },
-          { name: '_result', type: 'bytes32' },
-          { name: '_totalYes', type: 'uint256' },
-          { name: '_totalNo', type: 'uint256' },
-        ],
-        stateMutability: 'view',
-        type: 'function',
-      },
-    ],
-    functionName: 'getMarketInfo',
-    query: { enabled: !!marketAddress },
-  })
-
-  const { data: priceYes } = useReadContract({
-    address: marketAddress as `0x${string}`,
-    abi: [
-      {
-        inputs: [],
-        name: 'getPriceYes',
-        outputs: [{ name: 'priceRay', type: 'uint256' }],
-        stateMutability: 'view',
-        type: 'function',
-      },
-    ],
-    functionName: 'getPriceYes',
-    query: { enabled: !!marketAddress },
-  })
+  const ensureConnected = () => {
+    if (!connected || !account) {
+      alert('Please connect your Aptos wallet to trade')
+      return false
+    }
+    return true
+  }
 
   const handleTrade = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!marketAddress || !amount) return
-
-    // Robust connection guard: require address + walletClient
-    if (!address) {
-      alert('Please connect your wallet to trade')
+    if (marketId === undefined || !amount) {
+      alert('Market ID and amount are required')
       return
     }
+    if (!ensureConnected()) return
 
-    if (!walletClient) {
-      alert('Wallet client not available. Please reconnect your wallet.')
-      return
-    }
-
-    // Optional: ensure on the same chain as the market if your markets are per-chain
-    // Here we assume deploymentChain is the default chain for markets
-    if (chain && chain.id !== deploymentChain.id && chain.id !== pushDonutTestnet.id) {
-      try {
-        await switchChain({ chainId: deploymentChain.id })
-      } catch (err) {
-        console.error('Failed to switch network', err)
-        alert('Please switch to the correct network and try again')
-        return
-      }
-    }
-
+    setIsSubmitting(true)
     try {
-      const amountWei = parseEther(amount)
-      const minOut = (amountWei * BigInt(100 - slippage)) / BigInt(100)
-      const functionName = isYes ? 'buyYes' : 'buyNo'
+      // Use the new SDK functions with perception data
+      const amountNum = parseFloat(amount)
+      const payload = isYes
+        ? buyYesPayload(marketId, amountNum, agreementPercentage)
+        : buyNoPayload(marketId, amountNum, agreementPercentage)
 
-      await writeContract({
-        address: marketAddress as `0x${string}`,
-        abi: [
-          {
-            inputs: [
-              { name: 'uUsdIn', type: 'uint256' },
-              { name: 'minYesOut', type: 'uint256' },
-              { name: 'to', type: 'address' },
-            ],
-            name: 'buyYes',
-            outputs: [{ name: 'yesOut', type: 'uint256' }],
-            stateMutability: 'nonpayable',
-            type: 'function',
-          },
-          {
-            inputs: [
-              { name: 'uUsdIn', type: 'uint256' },
-              { name: 'minNoOut', type: 'uint256' },
-              { name: 'to', type: 'address' },
-            ],
-            name: 'buyNo',
-            outputs: [{ name: 'noOut', type: 'uint256' }],
-            stateMutability: 'nonpayable',
-            type: 'function',
-          },
-        ],
-        functionName: functionName as 'buyYes' | 'buyNo',
-        args: [amountWei, minOut, address],
-      })
+      const txnResult = await signAndSubmitTransaction({
+        type: 'entry_function_payload',
+        ...payload,
+      } as any)
+
+      const hashStr =
+        typeof txnResult === 'string'
+          ? txnResult
+          : (txnResult as any)?.hash || (txnResult as any)?.transaction_hash
+
+      if (hashStr) {
+        try {
+          await waitForTransaction(hashStr, 60_000)
+          alert('✅ Trade successful! Your perception has been recorded.')
+        } catch (err) {
+          console.warn('Could not confirm txn within timeout', err)
+          alert('⏳ Transaction submitted but confirmation timed out. Check your wallet.')
+        }
+      }
 
       onTradeComplete?.()
-    } catch (error) {
-      console.error('Trade failed:', error)
+    } catch (err) {
+      console.error('Trade failed:', err)
+      alert('Trade failed. See console for details.')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
-  const isExpired = marketInfo?.[1] ? Date.now() / 1000 > Number(marketInfo[1]) : false
-  const isSettled = marketInfo?.[2] || false
-  const price = priceYes ? Number(formatEther(priceYes)) : 0.5
-
   // Only show "connect wallet" if truly not connected
-  if (!isConnected || !address) {
+  if (!connected || !account) {
     return (
       <div className="p-6 border-2 border-dashed border-gray-300 rounded-lg text-center">
-        <p className="text-gray-500">Please connect your wallet to trade</p>
-      </div>
-    )
-  }
-
-  if (isSettled || isExpired) {
-    return (
-      <div className="p-6 border-2 border-dashed border-gray-300 rounded-lg text-center">
-        <p className="text-gray-500">
-          {isSettled ? 'This market has been settled' : 'This market has expired'}
-        </p>
+        <p className="text-gray-500">Please connect your Aptos wallet to trade</p>
       </div>
     )
   }
@@ -149,7 +90,7 @@ export default function TradeForm({ marketAddress, onTradeComplete }: TradeFormP
   return (
     <div className="bg-white border-2 border-gray-200 rounded-lg p-6 shadow-lg">
       <h3 className="text-lg font-semibold mb-4">Trade Prediction</h3>
-      
+
       <form onSubmit={handleTrade} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -211,24 +152,22 @@ export default function TradeForm({ marketAddress, onTradeComplete }: TradeFormP
         <div className="bg-neutral-900/10 p-4 rounded-lg">
           <div className="flex justify-between text-sm">
             <span>Current Price:</span>
-            <span className="font-medium">
-              {(price * 100).toFixed(1)}% YES
-            </span>
+            <span className="font-medium">--</span>
           </div>
           <div className="flex justify-between text-sm">
             <span>Estimated Shares:</span>
             <span className="font-medium">
-              {amount ? (parseFloat(amount) / price).toFixed(2) : '0'} {isYes ? 'YES' : 'NO'}
+              {amount ? (parseFloat(amount) / 1).toFixed(2) : '0'} {isYes ? 'YES' : 'NO'}
             </span>
           </div>
         </div>
 
         <button
           type="submit"
-          disabled={isPending || !amount}
-          className="w-full bg-amber-600 text-white py-3 px-4 rounded-lg hover:bg-amber-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          disabled={isSubmitting || !amount}
+          className="w-full bg-amber-600 hover:bg-amber-700 disabled:bg-gray-400 text-black font-medium py-2 px-4 rounded-lg shadow-sm hover:shadow-md transition-all"
         >
-          {isPending ? 'Processing...' : `Buy ${isYes ? 'YES' : 'NO'}`}
+          {isSubmitting ? 'Processing...' : `Buy ${isYes ? 'YES' : 'NO'}`}
         </button>
       </form>
     </div>

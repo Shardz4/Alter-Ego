@@ -1,23 +1,46 @@
 'use client'
 import { useWallet } from '@aptos-labs/wallet-adapter-react'
+import { useEffect, useState } from 'react'
+import { onAuthStateChanged, User } from '@/lib/firebase'
 
 export default function ConnectButton() {
-  const { connect, disconnect, wallets, connected, account } = useWallet()
+  const { connect, disconnect, connected, account, wallets } = useWallet()
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null)
 
-  const formatAddress = (addr?: string) => (addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '')
+  useEffect(() => {
+    const unsub = onAuthStateChanged((u: User | null) => setFirebaseUser(u))
+    return () => unsub()
+  }, [])
 
-  const onConnect = async () => {
-    // If you want to target a specific wallet, pass its name: connect(wallet.name)
-    // For now, try default connect flow which may prompt available wallets
+  const formatAddress = (addr?: any) => {
+    const addrStr = typeof addr === 'string' ? addr : addr?.toString?.() || ''
+    return addrStr ? `${addrStr.slice(0, 6)}...${addrStr.slice(-4)}` : ''
+  }
+
+  const handleConnect = async () => {
+    // Check if user is authenticated with Firebase first
+    if (!firebaseUser) {
+      alert('⚠️ Please sign in with Firebase first before connecting your wallet.')
+      return
+    }
+
     try {
-      if (wallets.length > 0) {
-        await connect(wallets[0].name)
-      } else {
-        alert('No Aptos wallet found. Please install Petra, Martian, etc.')
+      if (!wallets || wallets.length === 0) {
+        alert('No Aptos wallets detected. Please install Petra, Martian, Pontem, etc.')
+        return
       }
-    } catch (e) {
-      console.error('Aptos connect failed', e)
-      alert('Aptos wallet connection failed.')
+
+      // 🩹 Cast each wallet to “any” or a known shape
+      const targetWallet = wallets[0] as any
+      if (!targetWallet?.name) {
+        alert('No valid wallet found.')
+        return
+      }
+
+      await connect(targetWallet.name)
+    } catch (err) {
+      console.error('Aptos wallet connection failed:', err)
+      alert('Failed to connect wallet.')
     }
   }
 
@@ -25,27 +48,23 @@ export default function ConnectButton() {
     <div className="relative">
       {!connected ? (
         <button
-          onClick={onConnect}
+          onClick={handleConnect}
           type="button"
           className="bg-black text-amber-400 font-medium py-2 px-4 rounded-lg shadow-sm hover:shadow-md transition-all hover:bg-neutral-900 border border-amber-600/20"
         >
           Connect Aptos Wallet
         </button>
       ) : (
-        <div className="flex items-center space-x-3">
-          <div className="relative group">
-            <button
-              onClick={() => disconnect()}
-              type="button"
-              className="bg-black hover:bg-neutral-900 text-amber-400 font-bold py-2 px-4 rounded-lg shadow-sm border border-amber-600/20"
-            >
-              <span className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span>{formatAddress(account?.address)}</span>
-              </span>
-            </button>
-          </div>
-        </div>
+        <button
+          onClick={() => disconnect()}
+          type="button"
+          className="bg-black hover:bg-neutral-900 text-amber-400 font-bold py-2 px-4 rounded-lg shadow-sm border border-amber-600/20"
+        >
+          <span className="flex items-center space-x-2">
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+            <span>{formatAddress(account?.address)}</span>
+          </span>
+        </button>
       )}
     </div>
   )

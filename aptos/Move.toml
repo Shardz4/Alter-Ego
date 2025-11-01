@@ -4,12 +4,14 @@ version = "1.0.0"
 authors = []
 
 [addresses]
+senztrade = "0x12f832a0dae44072f03334bf5e740700ccb0576b3ad8b8436ef423d5f5a5503e" 
 
 [dev-addresses]
+senztrade = "0x1"  # Keep this for local/dev testing if needed
 
 [dependencies.AptosFramework]
 git = "https://github.com/aptos-labs/aptos-framework.git"
-rev = "mainnet"
+rev = "main"  # Use "main" for the latest compatible with testnet/devnet (not "mainnet")
 subdir = "aptos-framework"
 
 [dev-dependencies]

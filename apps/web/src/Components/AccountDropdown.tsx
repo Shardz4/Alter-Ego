@@ -2,11 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { signOutFirebase, onAuthStateChanged, User } from '@/lib/firebase';
-import { useAccount, useDisconnect } from 'wagmi';
-import {
-  PushUniversalAccountButton,
-} from '@pushchain/ui-kit';
+import { useWallet } from '@aptos-labs/wallet-adapter-react';
 import Link from 'next/link';
+import ConnectButton from './ConnectButton';
 
 export default function AccountDropdown() {
   const [user, setUser] = useState<User | null>(null);
@@ -18,18 +16,18 @@ export default function AccountDropdown() {
     return () => unsub();
   }, []);
 
-  const { isConnected } = useAccount();
-  const { disconnect } = useDisconnect();
+  const { connected, account, disconnect } = useWallet();
 
   useEffect(() => {
-    if (!user && isConnected) {
+    // If the firebase user signs out, also disconnect the wallet (best-effort).
+    if (!user && connected) {
       try {
-        disconnect();
+        disconnect && disconnect();
       } catch (err) {
         console.warn('Failed to disconnect wallet automatically', err);
       }
     }
-  }, [user, isConnected, disconnect]);
+  }, [user, connected, disconnect]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -44,7 +42,7 @@ export default function AccountDropdown() {
       await signOutFirebase();
     } finally {
       try {
-        disconnect();
+        disconnect && disconnect();
       } catch (err) {
         console.warn('Disconnect failed during sign out', err);
       }
@@ -82,19 +80,8 @@ export default function AccountDropdown() {
               </div>
 
               <div className="border-t border-gray-600 pt-3">
-                <PushUniversalAccountButton
-                  uid="alter-ego-wallet" // Matches walletConfig uid
-                  connectButtonText="Connect with Push Wallet"
-                  modalAppOverride={{
-                    title: 'Connect to Alter Ego',
-                  }}
-                  loginAppOverride={{
-                    title: 'Sign in with Email or Google',
-                  }}
-                  themeOverrides={{
-                    '--pwauth-btn-connect-bg-color': '#D4AF37', // Aligns with your amber theme
-                  }}
-                />
+                {/* Aptos connect button */}
+                <ConnectButton />
               </div>
 
               <div className="flex space-x-2">
@@ -108,27 +95,15 @@ export default function AccountDropdown() {
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="text-sm text-gray-300">You are not signed in.</div>
-              <div className="border-t border-gray-600 pt-3">
-                <PushUniversalAccountButton
-                  uid="alter-ego-wallet" // Matches walletConfig uid
-                  connectButtonText="Connect with Push Wallet"
-                  modalAppOverride={{
-                    title: 'Connect to Alter Ego',
-                  }}
-                  loginAppOverride={{
-                    title: 'Sign in with Email or Google',
-                  }}
-                  themeOverrides={{
-                    '--pwauth-btn-connect-bg-color': '#D4AF37', // Aligns with your amber theme
-                  }}
-                />
+              <div className="text-sm text-gray-300 mb-2">
+                <p className="font-semibold text-amber-400 mb-1">🔐 Sign in required</p>
+                <p className="text-xs">Please sign in with Google before connecting your wallet.</p>
               </div>
               <div className="flex space-x-2">
-                <Link href="/login" className="flex-1 bg-black py-2 rounded-lg text-amber-400 text-center border border-amber-600/20">
-                  Sign in
+                <Link href="/login" className="flex-1 bg-amber-600 hover:bg-amber-700 py-3 rounded-lg text-black text-center font-bold transition-all">
+                  Sign in with Google
                 </Link>
-                <button onClick={() => setOpen(false)} className="flex-1 bg-gray-800 py-2 rounded-lg text-gray-200">
+                <button onClick={() => setOpen(false)} className="flex-1 bg-gray-800 hover:bg-gray-700 py-3 rounded-lg text-gray-200 transition-all">
                   Close
                 </button>
               </div>

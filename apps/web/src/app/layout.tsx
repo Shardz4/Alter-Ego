@@ -6,11 +6,11 @@ import { Providers } from '@/Components/providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Universal Prediction Market',
-  description: 'Cross-chain prediction markets on Push Chain',
+  title: 'SenzTrade - Prediction to Perception',
+  description: 'Transform your predictions into perceptions with decentralized prediction markets',
   icons: {
-    icon: '\alter.ico',
-    shortcut: '\alter.ico',
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
   },
 };
 

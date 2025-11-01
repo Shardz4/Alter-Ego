@@ -32,10 +32,14 @@ export default function LoginPage() {
   }
 
   return (
-  <div className="min-h-screen flex items-center justify-center p-6 bg-black text-white">
-      <div className="w-full max-w-md bg-white/5 backdrop-blur rounded-xl p-6 shadow-lg">
-        <h1 className="text-2xl font-semibold mb-4">Sign in with Google</h1>
-        <p className="text-sm text-gray-300 mb-6">Use your Google account to sign in to the app.</p>
+  <div className="min-h-screen flex items-center justify-center p-6 bg-neutral-950 text-white">
+      <div className="w-full max-w-md bg-gray-900/60 backdrop-blur border-2 border-amber-600/20 rounded-2xl p-8 shadow-2xl">
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-bold text-amber-400 mb-2">SenzTrade 🧠</h1>
+          <p className="text-sm text-gray-400 italic mb-4">Prediction to Perception</p>
+          <h2 className="text-xl font-semibold text-white">Sign in to continue</h2>
+        </div>
+        <p className="text-sm text-gray-300 mb-6 text-center">Use your Google account to access prediction markets.</p>
 
         {user ? (
           <div className="space-y-4">
@@ -52,17 +56,23 @@ export default function LoginPage() {
             <div className="flex space-x-3">
               <button
                 onClick={handleSignOut}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg"
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-lg font-bold transition-all"
               >
                 Sign out
               </button>
+              <a
+                href="/"
+                className="flex-1 bg-amber-600 hover:bg-amber-700 text-black py-3 px-4 rounded-lg font-bold text-center transition-all"
+              >
+                Go to Markets
+              </a>
             </div>
           </div>
         ) : (
           <div className="space-y-4">
             <button
               onClick={handleSignIn}
-              className="w-full flex items-center justify-center space-x-3 bg-white text-slate-900 py-2 px-4 rounded-lg shadow"
+              className="w-full flex items-center justify-center space-x-3 bg-white hover:bg-gray-100 text-slate-900 py-3 px-4 rounded-lg shadow-lg font-bold transition-all"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="w-5 h-5">
                 <path fill="#fbbc05" d="M43.6 20.5H42V20H24v8h11.3C34.7 32 30 36 24 36c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.4 0 6.5 1.3 8.8 3.5l6.1-6.1C35.1 4.9 29.9 2 24 2 12.9 2 4 10.9 4 22s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.5z"/>
@@ -71,8 +81,14 @@ export default function LoginPage() {
               <span>Sign in with Google</span>
             </button>
 
-            <div className="text-xs text-gray-400">
-              You will be redirected to Google's sign-in popup. Ensure popups are allowed in your browser.
+            <div className="text-xs text-gray-400 text-center">
+              🔐 You will be redirected to Google's sign-in popup. Ensure popups are allowed in your browser.
+            </div>
+
+            <div className="pt-4 border-t border-gray-700">
+              <p className="text-xs text-gray-500 text-center">
+                After signing in, you'll be able to connect your Aptos wallet and start trading on prediction markets.
+              </p>
             </div>
           </div>
         )}

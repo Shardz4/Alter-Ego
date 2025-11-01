@@ -3,18 +3,16 @@
 import React, { ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react'
+import { Network } from '@aptos-labs/ts-sdk'
 
 const queryClient = new QueryClient()
 
-// You can register specific wallets (e.g., Petra, Martian) by importing their adapters.
-// For now, keep the list empty to allow default injected wallets.
-const wallets: any[] = []
-
-interface ProvidersProps { children: ReactNode }
-
-export function Providers({ children }: ProvidersProps) {
+export function Providers({ children }: { children: ReactNode }) {
   return (
-    <AptosWalletAdapterProvider plugins={wallets} autoConnect>
+    <AptosWalletAdapterProvider
+      autoConnect={true}
+      dappConfig={{ network: Network.TESTNET }}
+    >
       <QueryClientProvider client={queryClient}>
         {children}
       </QueryClientProvider>

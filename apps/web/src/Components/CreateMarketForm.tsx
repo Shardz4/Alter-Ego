@@ -1,12 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { useWriteContract, useAccount, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi'
-import { pushDonutTestnet as pushChain, deploymentChain } from '@/config/chains'
-import { Button } from './ui/Button'
-import { Input } from './ui/Input'
-import { Textarea } from './ui/Textarea'
-import { Checkbox } from './ui/Checkbox'
-import { Card } from './ui/Card'
+import { useWallet } from '@aptos-labs/wallet-adapter-react'
 
 interface CreateMarketFormProps {
   factoryAddress?: string
@@ -14,110 +8,87 @@ interface CreateMarketFormProps {
 }
 
 export default function CreateMarketForm({ factoryAddress, onMarketCreated }: CreateMarketFormProps) {
-  const { address, chain, isConnected } = useAccount()
-  const { data: walletClient } = useWalletClient()
-  const { writeContractAsync, isPending } = useWriteContract()
-  const { switchChain } = useSwitchChain()
-  const publicClient = usePublicClient()
+  const { account, connected, signAndSubmitTransaction } = useWallet()
   const [question, setQuestion] = useState('')
   const [resolveDate, setResolveDate] = useState('')
   const [resolveTime, setResolveTime] = useState('')
   const [showForm, setShowForm] = useState(false)
-  const [deployToPushChain, setDeployToPushChain] = useState(false)
+  const [deployToPushChain, setDeployToPushChain] = useState(false) // keep UI parity, but noop
   const [isNetworkSwitching, setIsNetworkSwitching] = useState(false)
-  
-  // Push Chain factory address - would typically come from environment variables
-  const PUSH_CHAIN_FACTORY_ADDRESS = "0x1234567890123456789012345678901234567890" // Replace with actual address
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const NODE_URL = process.env.NEXT_PUBLIC_APTOS_NODE_URL || 'https://fullnode.devnet.aptoslabs.com'
+  const MODULE_ADDR = process.env.NEXT_PUBLIC_MOVE_MODULE_ADDRESS || factoryAddress || ''
+
+  const ensureConnected = () => {
+    if (!connected || !account) {
+      alert('Please connect your Aptos wallet to create markets')
+      return false
+    }
+    return true
+  }
+
+  const waitForTxn = async (hash: string, timeoutMs = 60_000) => {
+    const start = Date.now()
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const res = await fetch(`${NODE_URL}/transactions/by_hash/${hash}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data.success !== undefined || data.vm_status) {
+            // transaction found (status available)
+            return data
+          }
+        }
+      } catch (e) {
+        // ignore and retry
+      }
+      await new Promise((r) => setTimeout(r, 1000))
+    }
+    throw new Error('Transaction confirmation timed out')
+  }
 
   const handleCreateMarket = async (e: React.FormEvent) => {
     e.preventDefault()
-
     if (!question || !resolveDate || !resolveTime) return
-
-    // Robust connection guard
-    if (!address) {
-      alert('Please connect your wallet to create markets')
-      return
-    }
-
-    if (!walletClient) {
-      alert('Wallet client not available. Please reconnect your wallet.')
+    if (!ensureConnected()) return
+    if (!MODULE_ADDR) {
+      alert('Move module address not configured. Set NEXT_PUBLIC_MOVE_MODULE_ADDRESS.')
       return
     }
 
     try {
       const resolveDateTime = new Date(`${resolveDate}T${resolveTime}`)
       const resolveTs = Math.floor(resolveDateTime.getTime() / 1000)
-      
       if (resolveTs <= Date.now() / 1000) {
         alert('Resolution time must be in the future')
         return
       }
 
-      // Switch to the appropriate network based on deployment choice
-      if (deployToPushChain && chain?.id !== pushChain.id) {
-        setIsNetworkSwitching(true)
-        try {
-          await switchChain({ chainId: pushChain.id })
-          await new Promise(resolve => setTimeout(resolve, 1000))
-        } catch (error) {
-          console.error('Failed to switch to Push Chain:', error)
-          alert('Failed to switch to Push Chain. Please try switching manually.')
-          setIsNetworkSwitching(false)
-          return
-        }
-        setIsNetworkSwitching(false)
-      } else if (!deployToPushChain && chain?.id !== deploymentChain.id) {
-        setIsNetworkSwitching(true)
-        try {
-          await switchChain({ chainId: deploymentChain.id })
-          await new Promise(resolve => setTimeout(resolve, 1000))
-        } catch (error) {
-          console.error(`Failed to switch to ${deploymentChain.name}:`, error)
-          alert(`Failed to switch to ${deploymentChain.name}. Please try switching manually.`)
-          setIsNetworkSwitching(false)
-          return
-        }
-        setIsNetworkSwitching(false)
+      setIsSubmitting(true)
+
+      // Example payload: calling a Move entry function `create_market` in your module
+      // Adjust the argument types and order to match your Move function signature.
+      const entryFunctionPayload = {
+        function: `${MODULE_ADDR}::marketplace::create_market`,
+        type_arguments: [],
+        arguments: [question, `${resolveTs}`],
       }
 
-      const envFactory = (process.env.NEXT_PUBLIC_MARKET_FACTORY_ADDRESS as string) || undefined
-      const envPushFactory = (process.env.NEXT_PUBLIC_PUSH_CHAIN_FACTORY_ADDRESS as string) || undefined
+      const txnHash = await signAndSubmitTransaction({
+        type: 'entry_function_payload',
+        ...entryFunctionPayload,
+      } as any) // wallet adapter's signAndSubmitTransaction expects a broad payload object
 
-      const targetAddress = deployToPushChain
-        ? (envPushFactory || PUSH_CHAIN_FACTORY_ADDRESS)
-        : (factoryAddress ?? envFactory) as `0x${string}` | undefined
+      // Some adapters return the whole txn result, others return hash — normalize:
+      let hashStr = typeof txnHash === 'string' ? txnHash : (txnHash as any)?.hash || (txnHash as any)?.transaction_hash
 
-      if (!targetAddress) {
-        alert('MarketFactory address is not configured. Set NEXT_PUBLIC_MARKET_FACTORY_ADDRESS in your frontend .env.local or pass factoryAddress prop.')
-        return
-      }
-
-      const marketAbi = [
-        {
-          inputs: [
-            { name: 'question', type: 'string' },
-            { name: 'resolveTs', type: 'uint64' },
-          ],
-          name: 'createMarket',
-          outputs: [{ name: 'market', type: 'address' }],
-          stateMutability: 'nonpayable',
-          type: 'function',
-        },
-      ]
-
-      const hash = await writeContractAsync({
-        address: targetAddress as `0x${string}`,
-        abi: marketAbi,
-        functionName: 'createMarket',
-        args: [question, BigInt(resolveTs)],
-      })
-
-      if (hash && publicClient) {
+      // If we have a txn hash, wait for confirmation (best-effort)
+      if (hashStr) {
         try {
-          await publicClient.waitForTransactionReceipt({ hash })
+          await waitForTxn(hashStr, 60_000)
         } catch (err) {
-          console.warn('Could not wait for tx confirmation:', err)
+          console.warn('Could not confirm txn within timeout', err)
         }
       }
 
@@ -125,29 +96,32 @@ export default function CreateMarketForm({ factoryAddress, onMarketCreated }: Cr
       setResolveDate('')
       setResolveTime('')
       setShowForm(false)
-      onMarketCreated?.('')
+      onMarketCreated?.(hashStr ?? '')
     } catch (error) {
       console.error('Market creation failed:', error)
+      alert('Market creation failed. See console for details.')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   // Only show "connect wallet" if truly not connected
-  if (!isConnected || !address) {
+  if (!connected || !account) {
     return (
       <div className="p-6 border-2 border-dashed border-gray-300 rounded-lg text-center">
-        <p className="text-gray-500">Please connect your wallet to create markets</p>
+        <p className="text-gray-500">Please connect your Aptos wallet to create markets</p>
       </div>
     )
   }
 
   return (
-    <Card>
+    <div className="bg-white border-2 border-gray-200 rounded-lg p-6 shadow-lg">
       {!showForm ? (
         <div className="text-center">
           <h3 className="text-xl font-semibold tracking-tight text-gray-900">Create a market</h3>
           <p className="mt-2 text-sm text-gray-500">Spin up a new binary market with a clear question and a future resolution time.</p>
           <div className="mt-6">
-            <Button onClick={() => setShowForm(true)} size="md">New market</Button>
+            <button onClick={() => setShowForm(true)} className="bg-amber-600 hover:bg-amber-700 text-black font-medium py-2 px-4 rounded-lg shadow-sm hover:shadow-md transition-all">New market</button>
           </div>
         </div>
       ) : (
@@ -159,61 +133,50 @@ export default function CreateMarketForm({ factoryAddress, onMarketCreated }: Cr
 
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">Market question</label>
-            <Textarea
+            <textarea
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Will Bitcoin reach $100,000 by the end of 2024?"
+              placeholder="Will Bitcoin reach $100,000 by the end of 2025?"
               required
               rows={3}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent"
             />
             <p className="text-xs text-gray-500">Be specific and unambiguous. Include any objective data sources if needed.</p>
           </div>
 
           <div className="flex items-center gap-2">
-            <Checkbox
+            <input
+              type="checkbox"
               id="deployToPushChain"
               checked={deployToPushChain}
               onChange={(e) => setDeployToPushChain((e.target as HTMLInputElement).checked)}
+              className="w-4 h-4 text-amber-600 bg-gray-100 border-gray-300 rounded focus:ring-amber-500"
             />
             <label htmlFor="deployToPushChain" className="text-sm text-gray-700">
-              Deploy to Push Chain (cross-chain)
+              (UI toggle kept for compatibility) Deploy to cross-chain (noop for Aptos)
             </label>
           </div>
-
-          {deployToPushChain ? (
-            <div className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-800">
-              <p>Your market will be deployed on Push Chain, enabling cross-chain trading and liquidity.</p>
-              {chain?.id !== pushChain.id && (
-                <p className="mt-1">You'll be prompted to switch to the Push Chain network.</p>
-              )}
-            </div>
-          ) : (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
-              <p>Your market will be deployed on Ethereum Sepolia testnet.</p>
-              {chain?.id !== deploymentChain.id && (
-                <p className="mt-1">You'll be prompted to switch to the Sepolia network.</p>
-              )}
-            </div>
-          )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Resolution date</label>
-              <Input
+              <input
                 type="date"
                 value={resolveDate}
                 onChange={(e) => setResolveDate(e.target.value)}
                 required
                 min={new Date().toISOString().split('T')[0]}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent"
               />
             </div>
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">Resolution time</label>
-              <Input
+              <input
                 type="time"
                 value={resolveTime}
                 onChange={(e) => setResolveTime(e.target.value)}
                 required
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent"
               />
             </div>
           </div>
@@ -229,19 +192,19 @@ export default function CreateMarketForm({ factoryAddress, onMarketCreated }: Cr
           </div>
 
           <div className="flex items-center gap-3">
-            <Button
+            <button
               type="submit"
-              disabled={isPending || isNetworkSwitching || !question || !resolveDate || !resolveTime}
-              fullWidth
+              disabled={isSubmitting || isNetworkSwitching || !question || !resolveDate || !resolveTime}
+              className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-400 text-black font-medium py-2 px-4 rounded-lg shadow-sm hover:shadow-md transition-all"
             >
-              {isNetworkSwitching ? 'Switching network…' : isPending ? 'Creating market…' : `Create on ${deployToPushChain ? 'Push Chain' : 'Sepolia'}`}
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
+              {isNetworkSwitching ? 'Switching network…' : isSubmitting ? 'Creating market…' : `Create on Aptos`}
+            </button>
+            <button type="button" onClick={() => setShowForm(false)} className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg shadow-sm hover:shadow-md transition-all">
               Cancel
-            </Button>
+            </button>
           </div>
         </form>
       )}
-    </Card>
+    </div>
   )
 }
