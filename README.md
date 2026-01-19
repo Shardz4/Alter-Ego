@@ -270,4 +270,4 @@ MIT License - see LICENSE file for details
 
 ---
 
-**PushChain** - Predicting the future, one market at a time. 🚀
+**Alter-Ego** - Predicting the future, one market at a time. 🚀
