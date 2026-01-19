@@ -1,6 +1,6 @@
-# PushChain: Universal Market Prediction System
+# Alter-Ego: Universal Market Prediction System
 
-PushChain is a decentralized prediction market platform that allows users to create, trade, and resolve prediction markets for any future event. Built on Ethereum with a modern React frontend, it provides a comprehensive ecosystem for prediction market trading.
+Alter-Ego is a decentralized prediction market platform that allows users to create, trade, and resolve prediction markets for any future event. Built on Ethereum with a modern React frontend, it provides a comprehensive ecosystem for prediction market trading.
 
 ## 🏗️ Architecture
 
